@@ -1,22 +1,11 @@
 from .constants import *
 
 class Stack:
-    windows = []
-    window_history = []
-    window = None
-    events = []
-    mousepos = (0,0)
-    mousepressed = None
-    keypressed = None
-    mouserel = (0,0)
-    memory = {}
-    last_element = None
-    place_side = False
-    custom_pos = None
+    windows, window_history, events, memory = [],[],[],{}
+    mousepos, mouserel = (0,0), (0,0)
+    mousepressed = keypressed = custom_pos = last_element = window = None
+    place_side = place_top = ignore_pos = start_called = False
     last_row_y = 0
-    start_called = False
-    ignore_pos = False
-    place_top = False
     
     @classmethod
     def add_window(cls, win):
