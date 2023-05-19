@@ -25,6 +25,8 @@ class damgui:
             abs = (rel[0]+winpos[0],rel[1]+winpos[1])
             type_ = "container"
         if id in _Stack.memory and type_ == "window": size = _Stack.memory[id]["size"]
+        if type_ == "container" and surf.get_size() != size:
+            surf = pygame.Surface((size[0]-settings.MARGIN,size[1]-settings.MARGIN),pygame.SRCALPHA)
         win = _base(id, type_,True,True,size,abs,rel,pygame.Rect(rel,size),pygame.Rect(abs,size),None,None,title,True,True,True)
         win.update({
             "title":title,
@@ -150,7 +152,7 @@ class damgui:
         settings.CORNER_RADIUS = settings.defaults["CORNER_RADIUS"]
     
     @classmethod
-    def dropdown(cls, id:Any, options:list[str], start_option:str, min_width:int=0, option_height:int = 30)->tuple[str,bool]:
+    def dropdown(cls, id:Any, options:list[str], start_option:str, min_width:int=0, min_option_height:int = 30)->tuple[str,bool]:
         """A dropdown element. Return a tuple with the currently selected option and whether the options are showing"""
         _Stack.win_check()
         isopen, option = False, start_option
@@ -159,17 +161,23 @@ class damgui:
             option = olddd["option"]
         if cls.button(f"{id}_option_btn",option): isopen = not isopen
         w = _Stack.last_element["sx"]+settings.MARGIN
+        option_height = _Stack.last_element["sy"]
         if cls.place_side().button(f"{id}_arrow_btn","▲" if isopen else "▼"): isopen = not isopen
         w += _Stack.last_element["sx"]
         if w < min_width: w = min_width
+        if option_height < min_option_height: option_height = min_option_height
         toth = option_height*len(options) + settings.MARGIN*(len(options)+1)
         if isopen:
-            settings.Y_MARGIN = settings.MARGIN
             cls.ignore_pos().place_above().container(f"{id}_options_cont",(w,toth))
+            settings.OUTLINE_COL = settings.ELEMENT_BG_COL
+            settings.CORNER_RADIUS = 0
             for i, opt in enumerate(options):
+                if i > 0: settings.Y_MARGIN = settings.MARGIN
                 if cls.button(f"{id}_option_{i}",opt,(w-settings.MARGIN*2,option_height),"center",True): option, isopen = opt, False
             cls.end()
             settings.Y_MARGIN = settings.defaults["Y_MARGIN"]
+            settings.OUTLINE_COL = settings.defaults["OUTLINE_COL"]
+            settings.CORNER_RADIUS = settings.defaults["CORNER_RADIUS"]
         dd = _base(id,"dropdown",False,False,(0,0),(0,0),(0,0),_EMPTY_R,_EMPTY_R,None,None,"",True,True,False,False)
         dd["isopen"], dd["option"] = isopen, option
         _Stack.add_element(dd)
@@ -192,7 +200,7 @@ class damgui:
         settings.CORNER_RADIUS = 0
         for i, opt in enumerate(options):
             if i > 0: settings.Y_MARGIN = 0
-            if cls.select_button((optionid:=f"{id}_option_{i}"),opt,(orisize[0]-settings.MARGIN*2,orisize[1]-settings.Y_MARGIN) if autoheight else (size[0],0),"center",False):
+            if cls.select_button((optionid:=f"{id}_option_{i}"),opt,(orisize[0]-settings.MARGIN*2,orisize[1]-settings.Y_MARGIN) if autoheight else (size[0]-settings.MARGIN*2,0),"center",False):
                 if multiselect:
                     if opt not in seloptions: seloptions.append(opt)
                 else:
