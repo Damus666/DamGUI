@@ -45,3 +45,4 @@ def render_window(surface, window):
     for el in window["elements"]:
         render_element(window["surf"],el)
     surface.blit(window["surf"],window["rect"])
+    

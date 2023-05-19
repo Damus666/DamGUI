@@ -7,11 +7,13 @@ from .constants import settings, DamGUIException
 from typing import Any, Self
 
 _IntIterable2D = tuple[int,int]|list[int]
+settings.init()
+
 class damgui:
     """Easly creates UI elements at runtime"""
     @classmethod
     def begin(cls, id:Any, title:str, pos:_IntIterable2D, min_size:_IntIterable2D, can_drag:bool=True, relative_pos:bool=False)->None:
-        """Create a window context or a container depending on the parameters. Must end it with damgui.end()"""
+        """Create a window context or a container depending on the parameters. Must end it with damgui.end(). A window will auto-resize based on the content"""
         _Stack.start_check()
         type_ = "window"
         abs = rel = pos
@@ -160,9 +162,11 @@ class damgui:
             isopen = (olddd:=_Stack.memory[id])["isopen"]
             option = olddd["option"]
         if cls.button(f"{id}_option_btn",option): isopen = not isopen
-        w = _Stack.last_element["sx"]+settings.MARGIN
+        w = _Stack.last_element["sx"]
         option_height = _Stack.last_element["sy"]
+        settings.MARGIN = 0
         if cls.place_side().button(f"{id}_arrow_btn","▲" if isopen else "▼"): isopen = not isopen
+        settings.MARGIN = settings.defaults["MARGIN"]
         w += _Stack.last_element["sx"]
         if w < min_width: w = min_width
         if option_height < min_option_height: option_height = min_option_height
@@ -184,9 +188,9 @@ class damgui:
         return option, isopen
     
     @classmethod
-    def selection_list(cls, id:Any, options:list[str], multiselect:bool=False, size:_IntIterable2D=(0,30), autoheight:bool=True)->str|list[str]:
-        """A selection list element. Depending on the multiselect flag return either the selected option or selected options.
-        If autoheight is set to True, the y component of size will be used as the element height"""
+    def selection_list(cls, id:Any, options:list[str], multi_select:bool=False, size:_IntIterable2D=(0,30), auto_height:bool=True)->str|list[str]:
+        """A selection list element. Depending on the multi_select flag return either the selected option or selected options.
+        If auto_height is set to True, the y component of size will be used as the element height"""
         _Stack.win_check()
         seloption, seloptions, optionbtns = None, [], []
         if id in _Stack.memory:
@@ -194,14 +198,14 @@ class damgui:
             seloptions = oldel["options"]
             optionbtns = oldel["optionbtns"]
         orisize = size
-        if autoheight: size = (size[0],size[1]*len(options)+settings.Y_MARGIN*2)
+        if auto_height: size = (size[0],size[1]*len(options)+settings.Y_MARGIN*2)
         cls.container(f"{id}_options_cont",size)
         settings.OUTLINE_COL = settings.ELEMENT_BG_COL
         settings.CORNER_RADIUS = 0
         for i, opt in enumerate(options):
             if i > 0: settings.Y_MARGIN = 0
-            if cls.select_button((optionid:=f"{id}_option_{i}"),opt,(orisize[0]-settings.MARGIN*2,orisize[1]-settings.Y_MARGIN) if autoheight else (size[0]-settings.MARGIN*2,0),"center",False):
-                if multiselect:
+            if cls.select_button((optionid:=f"{id}_option_{i}"),opt,(orisize[0]-settings.MARGIN*2,orisize[1]-settings.Y_MARGIN) if auto_height else (size[0]-settings.MARGIN*2,0),"center",False):
+                if multi_select:
                     if opt not in seloptions: seloptions.append(opt)
                 else:
                     seloption = opt
@@ -209,11 +213,11 @@ class damgui:
                         optionbtn = _Stack.memory[optionnnid]
                         if optionbtn["text"] != opt: optionbtn["selected"] = False
             else:
-                if multiselect:
+                if multi_select:
                     if opt in seloptions: seloptions.remove(opt)
                 else:
                     if seloption == opt: seloption = None
-            if not multiselect:
+            if not multi_select:
                 if optionid not in optionbtns: optionbtns.append(optionid)
         cls.end()
         settings.Y_MARGIN = settings.defaults["Y_MARGIN"]
@@ -222,7 +226,7 @@ class damgui:
         sl = _base(id,"selection_list",False,False,(0,0),(0,0),(0,0),_EMPTY_R,_EMPTY_R,None,None,"",False,False,False,False)
         sl["option"], sl["options"], sl["optionbtns"] = seloption, seloptions, optionbtns
         _Stack.add_element(sl)
-        return seloption if not multiselect else seloptions
+        return seloption if not multi_select else seloptions
     
     @staticmethod
     def frame_start()->None:
@@ -296,7 +300,7 @@ class damgui:
     
     @classmethod
     def custom_pos(cls, position:_IntIterable2D)->Self:
-        """The next element will be placed at a custom position"""
+        """The next element will be placed at a custom position relative to the current context"""
         _Stack.custom_pos = position
         return cls
     
@@ -314,5 +318,5 @@ class damgui:
     
     @staticmethod
     def get_stack()->_Stack:
-        """Return the stack. Caution"""
+        """Return the stack. Caution (its not meant to be used by the user)"""
         return _Stack

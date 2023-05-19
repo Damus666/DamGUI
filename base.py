@@ -2,11 +2,11 @@ from .constants import *
 from .stack import Stack
 
 def _size_minsize_surf(minsize,surf,istext=False):
-    ypadding = settings.PADDING if not istext else settings.TEXT_Y_PADDING
-    return max(minsize[0],surf.get_width()+settings.PADDING*2), max(minsize[1],surf.get_height()+ypadding*2)    
+    return max(minsize[0],surf.get_width()+settings.PADDING*2), max(minsize[1],surf.get_height()+(settings.PADDING if not istext else settings.TEXT_Y_PADDING)*2)
+ 
 def _size_surf(surf,istext=False):
-    ypadding = settings.PADDING if not istext else settings.TEXT_Y_PADDING
-    return surf.get_width()+settings.PADDING*2, surf.get_height()+ypadding*2
+    return surf.get_width()+settings.PADDING*2, surf.get_height()+(settings.PADDING if not istext else settings.TEXT_Y_PADDING)*2
+
 def _render_text(text):
     return settings.FONT.render(str(text),settings.TEXT_ANTIALIASING,settings.TEXT_COL)
 
@@ -25,12 +25,12 @@ def _relative_rect_pos(surf ,rect, posname):
     return surf.get_rect(**{posname:pos})
 
 def _get_basic(size):
-    winpos = Stack.window["pos"]; rel = Stack.get_rel()
+    winpos, rel = Stack.window["pos"], Stack.get_rel()
     abs = (winpos[0]+rel[0],winpos[1]+rel[1])
     return rel, abs, pygame.Rect(rel,size), pygame.Rect(abs,size)
 
 def _get_pos():
-    winpos = Stack.window["pos"]; rel = Stack.get_rel()
+    winpos, rel = Stack.window["pos"], Stack.get_rel()
     return rel, (winpos[0]+rel[0],winpos[1]+rel[1])
     
 def _base(id,type,bg,outline,size,abs,rel,rect,absrect,tsurf=None,trect=None,text="",canpress=True,canhover=True,darkbg=False,surfbg=False):
@@ -39,7 +39,7 @@ def _base(id,type,bg,outline,size,abs,rel,rect,absrect,tsurf=None,trect=None,tex
         "type":type,
         "bg":bg,
         "darkbg":darkbg,
-        "outline":outline,
+        "outline":outline if settings.OUTLINE_ENABLED else False,
         "size":size,
         "sx":size[0],
         "sy":size[1],

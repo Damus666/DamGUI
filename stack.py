@@ -72,17 +72,19 @@ class Stack:
     
     @classmethod
     def hovering(cls, rect, parent=None):
+        if not rect.collidepoint(cls.mousepos) or not (parent == None or parent["absrect"].collidepoint(cls.mousepos)): return False
         if not cls.place_top and parent:
             for el in parent["topelements"]:
                 if el["absrect"].collidepoint(cls.mousepos): return False
-        return rect.collidepoint(cls.mousepos) and (parent == None or parent["absrect"].collidepoint(cls.mousepos))
+        return True
     
     @classmethod
     def clicking(cls, rect, parent=None):
+        if not rect.collidepoint(cls.mousepos) or not (parent == None or parent["absrect"].collidepoint(cls.mousepos)) or not cls.mousepressed[0]: return False
         if not cls.place_top and parent:
             for el in parent["topelements"]:
                 if el["absrect"].collidepoint(cls.mousepos): return False
-        return rect.collidepoint(cls.mousepos) and (parent == None or parent["absrect"].collidepoint(cls.mousepos)) and cls.mousepressed[0]
+        return True
     
     @classmethod
     def was_clicking(cls, id):
