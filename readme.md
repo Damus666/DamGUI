@@ -9,11 +9,14 @@ All settings are customizable and the general look is modern
 - container
 - label
 - button
-- selected button
+- select button
+- image button
 - checkbox
 - image
+- slideshow
 - dropdown
 - selection list
+- progress bar
 - line
 - separator<br>
 

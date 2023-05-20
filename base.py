@@ -1,6 +1,8 @@
 from .constants import *
 from .stack import Stack
 
+_ColorValue = tuple[int,int,int]|list[int]|str|pygame.Color
+
 def _size_minsize_surf(minsize,surf,istext=False):
     return max(minsize[0],surf.get_width()+settings.PADDING*2), max(minsize[1],surf.get_height()+(settings.PADDING if not istext else settings.TEXT_Y_PADDING)*2)
  

@@ -24,11 +24,13 @@ def render_element(surface, element):
             pygame.draw.rect(surface,conf["OUTLINE_COL"],element["rect"],conf["OUTLINE_SIZE"],conf["CORNER_RADIUS"])
     if element["type"] == "checkbox":
         if element["selected"]: pygame.draw.rect(surface,conf["CHECKBOX_COL"],element["innerrect"],0,conf["CORNER_RADIUS"])
+    elif element["type"] == "progress_bar":
+        pygame.draw.rect(surface,element["fill_color"],element["fill_rect"],0,conf["CORNER_RADIUS"])
         
 def render_window(surface, window):
     conf = window["settings"]
     sx,sy = window["minsize"]
-    if window["type"] == "window":
+    if window["autosize"]:
         for el in window["elements"]:
             er = el["rx"]+el["sx"]
             eb = el["ry"]+el["sy"]

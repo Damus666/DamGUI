@@ -2,7 +2,7 @@ import pygame, warnings
 pygame.init()
 from .stack import Stack as _Stack
 from .render import render_all as _render_all
-from .base import _render_text,_size_minsize_surf,_base,_relative_rect_pos, _get_basic, _get_pos, _EMPTY_R
+from .base import _render_text,_size_minsize_surf,_base,_relative_rect_pos, _get_basic, _get_pos, _EMPTY_R, _ColorValue
 from .constants import settings, DamGUIException
 from typing import Any, Self
 
@@ -12,7 +12,7 @@ settings.init()
 class damgui:
     """Easly creates UI elements at runtime"""
     @classmethod
-    def begin(cls, id:Any, title:str, pos:_IntIterable2D, min_size:_IntIterable2D, can_drag:bool=True, relative_pos:bool=False)->None:
+    def begin(cls, id:Any, title:str, pos:_IntIterable2D, min_size:_IntIterable2D, can_drag:bool=True, relative_pos:bool=False,auto_size:bool=True)->None:
         """Create a window context or a container depending on the parameters. Must end it with damgui.end(). A window will auto-resize based on the content"""
         _Stack.start_check()
         type_ = "window"
@@ -26,7 +26,7 @@ class damgui:
             winpos = _Stack.window["pos"] if _Stack.window else (0,0)
             abs = (rel[0]+winpos[0],rel[1]+winpos[1])
             type_ = "container"
-        if id in _Stack.memory and type_ == "window": size = _Stack.memory[id]["size"]
+        if id in _Stack.memory and (type_ == "window" or auto_size): size = _Stack.memory[id]["size"]
         if type_ == "container" and surf.get_size() != size:
             surf = pygame.Surface((size[0]-settings.MARGIN,size[1]-settings.MARGIN),pygame.SRCALPHA)
         win = _base(id, type_,True,True,size,abs,rel,pygame.Rect(rel,size),pygame.Rect(abs,size),None,None,title,True,True,True)
@@ -37,6 +37,7 @@ class damgui:
             "drag_offset":(0,0),
             "minsize":min_size,
             "surf":surf,
+            "autosize":auto_size,
         })
         if relative_pos: win["relative"] = True
         if id in _Stack.memory and can_drag:
@@ -68,6 +69,17 @@ class damgui:
         rel,abs,rect,absrect = _get_basic(size)
         was_clicking = _Stack.was_clicking(id)
         btn = _base( id,"button",True,True,size,abs,rel,rect,absrect,tsurf,_relative_rect_pos(tsurf,rect,text_pos),text)
+        _Stack.add_element(btn)
+        return btn["pressed"] and not was_clicking
+    
+    @staticmethod
+    def image_button(id:Any, surface:pygame.Surface):
+        _Stack.win_check()
+        surfsize = surface.get_size()
+        size = (surfsize[0]+settings.PADDING*2,surfsize[1]+settings.PADDING*2)
+        rel,abs,rect,absrect = _get_basic(size)
+        was_clicking = _Stack.was_clicking(id)
+        btn = _base(id,"image_button",True,True,size,abs,rel,rect,absrect,surface,surface.get_rect(center=rect.center))
         _Stack.add_element(btn)
         return btn["pressed"] and not was_clicking
     
@@ -106,6 +118,25 @@ class damgui:
         return btn["selected"]
     
     @staticmethod
+    def progress_bar(id:Any, size:_IntIterable2D, max_value:int|float, current_value:int|float, fill_color:_ColorValue="red", fill_direction:str="left-right"):
+        """A progress bar element. Can customize the color and the fill direction"""
+        _Stack.win_check()
+        rel, abs, rect, absrect = _get_basic(size)
+        if not fill_direction in ("left-right","right-left","up-down","down-up"): raise DamGUIException("Supported progress bar fill directions are: left-right, right-left, up-down, down-up")
+        if "left" in fill_direction:
+            cur_size = (current_value*size[0])/max_value
+            fill_rect = pygame.Rect(rel,(cur_size,size[1]))
+        elif "up" in fill_direction:
+            cur_size = (current_value*size[1])/max_value
+            fill_rect = pygame.Rect(rel,(size[0],cur_size))
+        if fill_direction == "right-left": fill_rect.topright = rect.topright
+        if fill_direction == "down-up": fill_rect.bottomright = rect.bottomright
+        fill_rect.inflate_ip(-settings.MARGIN*2,-settings.MARGIN*2)
+        pbar = _base(id, "progress_bar",True,True,size,abs,rel,rect,absrect,None,None,"",False,False)
+        pbar["fill_rect"],pbar["fill_color"] = fill_rect,fill_color
+        _Stack.add_element(pbar)
+    
+    @staticmethod
     def label(id:Any, text:str, min_size:_IntIterable2D=(0,0), text_pos:str="center", force_size:bool=False)->None:
         """A label displaying text"""
         _Stack.win_check()
@@ -120,10 +151,10 @@ class damgui:
         _Stack.add_element(_base(id,"label",False,False,size,abs,rel,rect,absrect,tsurf,_relative_rect_pos(tsurf,rect,text_pos),text))
         
     @classmethod
-    def container(cls,id:Any, size:_IntIterable2D, outline:bool=True)->None:
+    def container(cls,id:Any, size:_IntIterable2D, outline:bool=True, auto_size:bool=False)->None:
         """Creates a container context. Must be closed with damgui.end()"""
         _Stack.win_check()
-        cls.begin(id,"",(0,0),size,False,True)
+        cls.begin(id,"",(0,0),size,False,True,auto_size)
         if not outline: _Stack.last_element["outline"] = False
         
     @staticmethod
@@ -152,6 +183,33 @@ class damgui:
         settings.CORNER_RADIUS = 0
         _Stack.add_element(_base(id,"image",False,True,size,abs,rel,rect,absrect,surface,rect,"",True,True,False,True))
         settings.CORNER_RADIUS = settings.defaults["CORNER_RADIUS"]
+        
+    @classmethod
+    def slideshow(cls,id:Any, surfaces:list[pygame.Surface], fancy_arrows:bool=False)->pygame.Surface:
+        """Implements 2 buttons to go through a list of images. Return the currently displaying image"""
+        if (surfaces_len:=len(surfaces)) <= 0: raise DamGUIException("'surfaces' parameter of damgui.slide_show() must be a non-empty sequence")
+        index = 0
+        if id in _Stack.memory: index = _Stack.memory[id]["surface_index"]
+        if surfaces_len <= index: index = surfaces_len-1
+        surface = surfaces[index]
+        sizes = surface.get_size()
+        cls.container(f"{id}_container",(sizes[0],sizes[1]),False,True)
+        settings.ELEMENT_BG_COL = settings.WINDOW_BG_COL
+        settings.OUTLINE_ENABLED = False
+        if cls.button(f"{id}_left_btn","<" if not fancy_arrows else "◀",(0,sizes[1])):
+            if index > 0: index -= 1
+        settings.OUTLINE_ENABLED = True
+        cls.place_side().image(f"{id}_image",surface)
+        settings.OUTLINE_ENABLED = False
+        if cls.place_side().button(f"{id}_right_btn",">" if not fancy_arrows else "▶",(0,sizes[1])):
+            if index < surfaces_len-1: index += 1
+        settings.ELEMENT_BG_COL = settings.defaults["ELEMENT_BG_COL"]
+        settings.OUTLINE_ENABLED = True
+        cls.end()
+        slideshow = _base(id,"slideshow",False,False,(0,0),(0,0),(0,0),_EMPTY_R,_EMPTY_R)
+        slideshow["surface_index"] = index
+        _Stack.add_element(slideshow)
+        return surface
     
     @classmethod
     def dropdown(cls, id:Any, options:list[str], start_option:str, min_width:int=0, min_option_height:int = 30)->tuple[str,bool]:
