@@ -14,7 +14,7 @@ def render_element(surface, element):
         col = conf["ELEMENT_BG_COL"]
         if element["darkbg"]: col = conf["WINDOW_BG_COL"]
         if element["hovering"]: col = conf["ELEMENT_HOVER_COL"]
-        if element["pressed"] or (element["selected"] and not element["hovering"]): col = conf["ELEMENT_PRESS_COL"]
+        if (element["pressed"] or (element["selected"] and not element["hovering"]) or element["unhover_press"]) and element["canrenderpress"]: col = conf["ELEMENT_PRESS_COL"]
         pygame.draw.rect(surface,col,element["rect"],0,conf["CORNER_RADIUS"])
     if element["outline"] and not element["surfbg"]:
         pygame.draw.rect(surface,conf["OUTLINE_COL"],element["rect"],conf["OUTLINE_SIZE"],conf["CORNER_RADIUS"])

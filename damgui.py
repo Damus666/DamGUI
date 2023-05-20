@@ -70,7 +70,10 @@ class damgui:
         was_clicking = _Stack.was_clicking(id)
         btn = _base( id,"button",True,True,size,abs,rel,rect,absrect,tsurf,_relative_rect_pos(tsurf,rect,text_pos),text)
         _Stack.add_element(btn)
-        return btn["pressed"] and not was_clicking
+        action = btn["pressed"] and (not was_clicking and not _Stack.pressed_last_frame)
+        if action: btn["press_allow"] = True
+        if not _Stack.mousepressed[0]: btn["press_allow"] = False
+        return action
     
     @staticmethod
     def image_button(id:Any, surface:pygame.Surface):
@@ -81,7 +84,10 @@ class damgui:
         was_clicking = _Stack.was_clicking(id)
         btn = _base(id,"image_button",True,True,size,abs,rel,rect,absrect,surface,surface.get_rect(center=rect.center))
         _Stack.add_element(btn)
-        return btn["pressed"] and not was_clicking
+        action = btn["pressed"] and (not was_clicking and not _Stack.pressed_last_frame)
+        if action: btn["press_allow"] = True
+        if not _Stack.mousepressed[0]: btn["press_allow"] = False
+        return action
     
     @staticmethod
     def select_button(id:Any,text:str,min_size:_IntIterable2D=(0,0), text_pos:str="center",force_size:bool=False)->bool:
@@ -99,8 +105,9 @@ class damgui:
         btn["selected"] = _Stack.was_selected(id)
         was_clicking = _Stack.was_clicking(id)
         _Stack.add_element(btn)
-        action_true = btn["pressed"] and not was_clicking
-        if action_true: btn["selected"] = not btn["selected"]
+        action_true = btn["pressed"] and (not was_clicking and not _Stack.pressed_last_frame)
+        if action_true: btn["selected"] = not btn["selected"]; btn["press_allow"] = True
+        if not _Stack.mousepressed[0]: btn["press_allow"] = False
         return btn["selected"]
     
     @staticmethod
@@ -113,8 +120,9 @@ class damgui:
         btn["innerrect"] = rect.inflate(-settings.PADDING*2,-settings.PADDING*2)
         was_clicking = _Stack.was_clicking(id)
         _Stack.add_element(btn)
-        action_true = btn["pressed"] and not was_clicking
-        if action_true: btn["selected"] = not btn["selected"]
+        action_true = btn["pressed"] and (not was_clicking and not _Stack.pressed_last_frame)
+        if action_true: btn["selected"] = not btn["selected"]; btn["press_allow"] = True
+        if not _Stack.mousepressed[0]: btn["press_allow"] = False
         return btn["selected"]
     
     @staticmethod
@@ -220,7 +228,7 @@ class damgui:
             isopen = (olddd:=_Stack.memory[id])["isopen"]
             option = olddd["option"]
         if cls.button(f"{id}_option_btn",option): isopen = not isopen
-        w = _Stack.last_element["sx"]
+        w = _Stack.last_element["sx"]-settings.MARGIN
         option_height = _Stack.last_element["sy"]
         settings.MARGIN = 0
         if cls.place_side().button(f"{id}_arrow_btn","▲" if isopen else "▼"): isopen = not isopen
@@ -230,12 +238,12 @@ class damgui:
         if option_height < min_option_height: option_height = min_option_height
         toth = option_height*len(options) + settings.MARGIN*(len(options)+1)
         if isopen:
-            cls.ignore_pos().place_above().container(f"{id}_options_cont",(w,toth))
+            cls.ignore_pos().place_above().container(f"{id}_options_cont",(w,toth),True,True)
             settings.OUTLINE_COL = settings.ELEMENT_BG_COL
             settings.CORNER_RADIUS = 0
             for i, opt in enumerate(options):
                 if i > 0: settings.Y_MARGIN = settings.MARGIN
-                if cls.button(f"{id}_option_{i}",opt,(w-settings.MARGIN*2,option_height),"center",True): option, isopen = opt, False
+                if cls.button(f"{id}_option_{i}",opt,(w-settings.MARGIN,option_height),"center",True): option, isopen = opt, False
             cls.end()
             settings.Y_MARGIN = settings.defaults["Y_MARGIN"]
             settings.OUTLINE_COL = settings.defaults["OUTLINE_COL"]
@@ -286,6 +294,30 @@ class damgui:
         _Stack.add_element(sl)
         return seloption if not multi_select else seloptions
     
+    @classmethod
+    def slider(cls, id:Any, width:int, direction:str="horizontal", thicness:int=15, start_rel:float = 0.5, handle_size:int=30)->float:
+        """A slider element. Can be horizontal or vertical and higly customizable. Return a value between 0-1 representing the percentage the handle is on"""
+        _Stack.win_check()
+        if direction not in ("horizontal","vertical","h","v"): raise DamGUIException("Supported directions for sliders are 'horizontal', 'vertical', 'h', 'v'")
+        if direction == "h": direction = "horizontal"
+        handle_pos = (start_rel*width)-handle_size//2
+        if id in _Stack.memory: handle_pos = _Stack.memory[id]["handle_pos"]
+        size = (width,thicness) if direction == "horizontal" else (thicness,width)
+        rel, abs, rect, absrect = _get_basic(size,offset:=((handle_size//2,handle_size//2-thicness//2) if direction =="horizontal" else (handle_size//2-thicness//2,handle_size//2)))
+        slider = _base(id,"slider",True,True,size,abs,rel,rect,absrect,None,None,"",False,False,True,False,offset)
+        _Stack.add_element(slider)
+        settings.CORNER_RADIUS = handle_size//2
+        cls.custom_pos((rel[0]+handle_pos,rel[1]-handle_size//2+thicness//2) if direction == "horizontal" else (rel[0]-handle_size//2+thicness//2,rel[1]+handle_pos))
+        cls.button(f"{id}_handle_btn","",(handle_size,handle_size))
+        if _Stack.last_element["unhover_press"] and _Stack.last_element["canrenderpress"]:
+            if direction == "horizontal": handle_pos += _Stack.mouserel[0]
+            else: handle_pos += _Stack.mouserel[1]
+            if handle_pos < -handle_size//2: handle_pos = -handle_size//2
+            elif handle_pos > width-handle_size//2: handle_pos = width-handle_size//2
+        slider["handle_pos"] = handle_pos
+        settings.CORNER_RADIUS = settings.defaults["CORNER_RADIUS"]
+        return (handle_pos+handle_size//2)/width
+    
     @staticmethod
     def frame_start()->None:
         """Reset the stack to prepare for a new frame. Call before the event loop"""
@@ -307,6 +339,7 @@ class damgui:
         if _Stack.window: raise DamGUIException("All windows must be closed before ending the frame")
         _render_all(surface)
         _Stack.start_called = False
+        _Stack.pressed_last_frame = _Stack.mousepressed[0]
         
     @staticmethod
     def interact_data(id:Any)->dict[str,bool]:

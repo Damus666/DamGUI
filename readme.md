@@ -17,6 +17,7 @@ All settings are customizable and the general look is modern
 - dropdown
 - selection list
 - progress bar
+- slider
 - line
 - separator<br>
 

@@ -5,6 +5,7 @@ class Stack:
     mousepos, mouserel = (0,0), (0,0)
     mousepressed = keypressed = custom_pos = last_element = window = None
     place_side = place_top = ignore_pos = start_called = False
+    pressed_last_frame = False
     last_row_y = 0
     
     @classmethod
@@ -50,10 +51,10 @@ class Stack:
         if cls.custom_pos: return cls.custom_pos
         x = y = 0
         for el in cls.window["elements"]:
-            if (newy:=(el["ry"]+el["sy"])) > y and not el["ignorepos"]: y = newy if not cls.place_side else el["ry"]
+            if (newy:=(el["ry"]+el["sy"]+el["oy"])) > y and not el["ignorepos"]: y = newy if not cls.place_side else el["ry"]
         if cls.place_side:
             for el in cls.window["elements"]:
-                if el["ry"] == y and (newx:=(el["rx"]+el["sx"])) > x and not el["ignorepos"]: x = newx
+                if el["ry"] == y and (newx:=(el["rx"]+el["sx"]+el["ox"])) > x and not el["ignorepos"]: x = newx
             y = cls.last_row_y
         else: cls.last_row_y = y
         return x+settings.MARGIN,y+settings.Y_MARGIN
@@ -87,9 +88,17 @@ class Stack:
         return True
     
     @classmethod
+    def was_hovering(cls, id):
+        return id in cls.memory and cls.memory[id]["hovering"]
+    
+    @classmethod
     def was_clicking(cls, id):
         return id in cls.memory and cls.memory[id]["pressed"]
     
     @classmethod
     def was_selected(cls, id):
         return id in cls.memory and cls.memory[id]["selected"]
+    
+    @classmethod
+    def was_allowed(cls, id):
+        return id in cls.memory and cls.memory[id]["press_allow"]

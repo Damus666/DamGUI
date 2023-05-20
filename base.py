@@ -26,16 +26,18 @@ def _relative_rect_pos(surf ,rect, posname):
         case "midbottom": pos = (rect.centerx,rect.bottom-settings.MARGIN)
     return surf.get_rect(**{posname:pos})
 
-def _get_basic(size):
+def _get_basic(size, offset=(0,0)):
     winpos, rel = Stack.window["pos"], Stack.get_rel()
+    rel = (rel[0]+offset[0],rel[1]+offset[1])
     abs = (winpos[0]+rel[0],winpos[1]+rel[1])
     return rel, abs, pygame.Rect(rel,size), pygame.Rect(abs,size)
 
-def _get_pos():
+def _get_pos(offset=(0,0)):
     winpos, rel = Stack.window["pos"], Stack.get_rel()
+    rel = (rel[0]+offset[0],rel[1]+offset[1])
     return rel, (winpos[0]+rel[0],winpos[1]+rel[1])
     
-def _base(id,type,bg,outline,size,abs,rel,rect,absrect,tsurf=None,trect=None,text="",canpress=True,canhover=True,darkbg=False,surfbg=False):
+def _base(id,type,bg,outline,size,abs,rel,rect,absrect,tsurf=None,trect=None,text="",canpress=True,canhover=True,darkbg=False,surfbg=False,offset=(0,0)):
     el = {
         "id":id,
         "type":type,
@@ -51,6 +53,9 @@ def _base(id,type,bg,outline,size,abs,rel,rect,absrect,tsurf=None,trect=None,tex
         "rel":rel,
         "rx":rel[0],
         "ry":rel[1],
+        "offset":offset,
+        "ox":offset[0],
+        "oy":offset[1],
         "rect":rect,
         "absrect":absrect,
         "tsurf":tsurf,
@@ -67,9 +72,12 @@ def _base(id,type,bg,outline,size,abs,rel,rect,absrect,tsurf=None,trect=None,tex
         "elements":[],
         "topelements":[],
         "parent":Stack.window,
+        "canrenderpress":True,
+        "press_allow":Stack.was_allowed(id),
     }
     if el["pressed"] or (id in Stack.memory and Stack.memory[id]["unhover_press"]): el["unhover_press"] = True
     if not Stack.mousepressed[0]: el["unhover_press"] = False
+    if not el["press_allow"]: el["unhover_press"] = False; el["canrenderpress"] = False
     return el
 
 _EMPTY_R = pygame.Rect(0,0,0,0)
