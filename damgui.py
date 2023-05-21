@@ -12,14 +12,15 @@ settings.init()
 class damgui:
     """Easly creates UI elements at runtime"""
     @classmethod
-    def begin(cls, id:Any, title:str, pos:_IntIterable2D, min_size:_IntIterable2D, can_drag:bool=True, relative_pos:bool=False,auto_size:bool=True)->None:
+    def begin(cls, id:str, title:str, pos:_IntIterable2D, min_size:_IntIterable2D, can_drag:bool=True, relative_pos:bool=False,auto_size:bool=True,can_scroll:bool=True)->None:
         """Create a window context or a container depending on the parameters. Must end it with damgui.end(). A window will auto-resize based on the content"""
         _Stack.start_check()
         type_ = "window"
         abs = rel = pos
-        size = min_size
-        if id in _Stack.memory: surf = _Stack.memory[id]["surf"]
-        else: surf = pygame.Surface((min_size[0]-settings.MARGIN,min_size[1]-settings.MARGIN),pygame.SRCALPHA)
+        size = realsize = min_size
+        scrolloffset = (0,0)
+        if id in _Stack.memory: surf = (oldwin:=_Stack.memory[id])["surf"]; scrolloffset = oldwin["scrolloffset"]; realsize = oldwin["realsize"]
+        else: surf = pygame.Surface((min_size[0]-settings.MARGIN,min_size[1]-settings.Y_MARGIN),pygame.SRCALPHA)
         surf.fill(0)
         if relative_pos and _Stack.window:
             rel = _Stack.get_rel()
@@ -29,7 +30,7 @@ class damgui:
         if id in _Stack.memory and (type_ == "window" or auto_size): size = _Stack.memory[id]["size"]
         if type_ == "container" and surf.get_size() != size:
             surf = pygame.Surface((size[0]-settings.MARGIN,size[1]-settings.MARGIN),pygame.SRCALPHA)
-        win = _base(id, type_,True,True,size,abs,rel,pygame.Rect(rel,size),pygame.Rect(abs,size),None,None,title,True,True,True)
+        win = _base(id, type_,True,True,size,abs,rel,pygame.Rect(rel,size),pygame.Rect(abs,size),None,None,title,True,True,True,scrolloffset=scrolloffset)
         win.update({
             "title":title,
             "pos":abs,
@@ -38,6 +39,8 @@ class damgui:
             "minsize":min_size,
             "surf":surf,
             "autosize":auto_size,
+            "can_scroll":can_scroll,
+            "realsize":realsize,
         })
         if relative_pos: win["relative"] = True
         if id in _Stack.memory and can_drag:
@@ -50,14 +53,19 @@ class damgui:
             cls.button(f"{id}_title_bar",title,(surf.get_width()-settings.MARGIN,0),"midleft")
             if cls.last_data()["unhover_press"] and can_drag:
                 win["drag_offset"] = (win["drag_offset"][0]+_Stack.mouserel[0],win["drag_offset"][1]+_Stack.mouserel[1])
-        
+        if can_scroll:
+            if win["realsize"][0] > win["size"][0]:
+                _scrollbar("horizontal", win, id)
+            if win["realsize"][1] > win["size"][1]:
+                _scrollbar("vertical", win, id)
+
     @staticmethod
     def end()->None:
         """Close the last opened context"""
         _Stack.remove_last()
         
     @staticmethod
-    def button(id:Any,text:str, min_size:_IntIterable2D=(0,0), text_pos:str="center", force_size:bool=False)->bool:
+    def button(id:str, text:str, min_size:_IntIterable2D=(0,0), text_pos:str="center", force_size:bool=False)->bool:
         """Create a button element. Return whether the button has been clicked"""
         _Stack.win_check()
         if id in _Stack.memory and (oldel:=_Stack.memory[id])["text"] == text:
@@ -76,7 +84,7 @@ class damgui:
         return action
     
     @staticmethod
-    def image_button(id:Any, surface:pygame.Surface):
+    def image_button(id:str, surface:pygame.Surface):
         _Stack.win_check()
         surfsize = surface.get_size()
         size = (surfsize[0]+settings.PADDING*2,surfsize[1]+settings.PADDING*2)
@@ -90,7 +98,7 @@ class damgui:
         return action
     
     @staticmethod
-    def select_button(id:Any,text:str,min_size:_IntIterable2D=(0,0), text_pos:str="center",force_size:bool=False)->bool:
+    def select_button(id:str,text:str,min_size:_IntIterable2D=(0,0), text_pos:str="center",force_size:bool=False)->bool:
         """A button element that once pressed stays like so until it's pressed again. Return whether it's in the pressed state"""
         _Stack.win_check()
         if id in _Stack.memory and (oldel:=_Stack.memory[id])["text"] == text:
@@ -111,7 +119,7 @@ class damgui:
         return btn["selected"]
     
     @staticmethod
-    def checkbox(id:Any, size:_IntIterable2D)->bool:
+    def checkbox(id:str, size:_IntIterable2D)->bool:
         """A damgui.select_button with a special UI"""
         _Stack.win_check()
         rel,abs,rect,absrect = _get_basic(size)
@@ -126,7 +134,7 @@ class damgui:
         return btn["selected"]
     
     @staticmethod
-    def progress_bar(id:Any, size:_IntIterable2D, max_value:int|float, current_value:int|float, fill_color:_ColorValue="red", fill_direction:str="left-right"):
+    def progress_bar(id:str, size:_IntIterable2D, max_value:int|float, current_value:int|float, fill_color:_ColorValue="red", fill_direction:str="left-right"):
         """A progress bar element. Can customize the color and the fill direction"""
         _Stack.win_check()
         rel, abs, rect, absrect = _get_basic(size)
@@ -139,13 +147,13 @@ class damgui:
             fill_rect = pygame.Rect(rel,(size[0],cur_size))
         if fill_direction == "right-left": fill_rect.topright = rect.topright
         if fill_direction == "down-up": fill_rect.bottomright = rect.bottomright
-        fill_rect.inflate_ip(-settings.MARGIN*2,-settings.MARGIN*2)
+        fill_rect.inflate_ip(-settings.MARGIN*2 if (fill_rect.w-(settings.MARGIN*2) >= 1) else 0,-settings.MARGIN*2  if (fill_rect.h-(settings.MARGIN*2) >= 1) else 0)
         pbar = _base(id, "progress_bar",True,True,size,abs,rel,rect,absrect,None,None,"",False,False)
         pbar["fill_rect"],pbar["fill_color"] = fill_rect,fill_color
         _Stack.add_element(pbar)
     
     @staticmethod
-    def label(id:Any, text:str, min_size:_IntIterable2D=(0,0), text_pos:str="center", force_size:bool=False)->None:
+    def label(id:str, text:str, min_size:_IntIterable2D=(0,0), text_pos:str="center", force_size:bool=False)->None:
         """A label displaying text"""
         _Stack.win_check()
         if id in _Stack.memory and (oldel:=_Stack.memory[id])["text"] == text:
@@ -159,10 +167,10 @@ class damgui:
         _Stack.add_element(_base(id,"label",False,False,size,abs,rel,rect,absrect,tsurf,_relative_rect_pos(tsurf,rect,text_pos),text))
         
     @classmethod
-    def container(cls,id:Any, size:_IntIterable2D, outline:bool=True, auto_size:bool=False)->None:
+    def container(cls,id:str, size:_IntIterable2D, outline:bool=True, auto_size:bool=False, can_scroll:bool=True)->None:
         """Creates a container context. Must be closed with damgui.end()"""
         _Stack.win_check()
-        cls.begin(id,"",(0,0),size,False,True,auto_size)
+        cls.begin(id,"",(0,0),size,False,True,auto_size,can_scroll)
         if not outline: _Stack.last_element["outline"] = False
         
     @staticmethod
@@ -183,7 +191,7 @@ class damgui:
         _Stack.add_element(line)
     
     @staticmethod
-    def image(id:Any, surface:pygame.Surface):
+    def image(id:str, surface:pygame.Surface):
         """An image with a custom surface"""
         _Stack.win_check()
         size = surface.get_size()
@@ -193,7 +201,7 @@ class damgui:
         settings.CORNER_RADIUS = settings.defaults["CORNER_RADIUS"]
         
     @classmethod
-    def slideshow(cls,id:Any, surfaces:list[pygame.Surface], fancy_arrows:bool=False)->pygame.Surface:
+    def slideshow(cls,id:str, surfaces:list[pygame.Surface], fancy_arrows:bool=False)->pygame.Surface:
         """Implements 2 buttons to go through a list of images. Return the currently displaying image"""
         if (surfaces_len:=len(surfaces)) <= 0: raise DamGUIException("'surfaces' parameter of damgui.slide_show() must be a non-empty sequence")
         index = 0
@@ -201,7 +209,9 @@ class damgui:
         if surfaces_len <= index: index = surfaces_len-1
         surface = surfaces[index]
         sizes = surface.get_size()
-        cls.container(f"{id}_container",(sizes[0],sizes[1]),False,True)
+        cls.container(f"{id}_container",sizes,True,True)
+        __cont = _Stack.last_element
+        prev = settings.ELEMENT_BG_COL
         settings.ELEMENT_BG_COL = settings.WINDOW_BG_COL
         settings.OUTLINE_ENABLED = False
         if cls.button(f"{id}_left_btn","<" if not fancy_arrows else "◀",(0,sizes[1])):
@@ -211,33 +221,37 @@ class damgui:
         settings.OUTLINE_ENABLED = False
         if cls.place_side().button(f"{id}_right_btn",">" if not fancy_arrows else "▶",(0,sizes[1])):
             if index < surfaces_len-1: index += 1
-        settings.ELEMENT_BG_COL = settings.defaults["ELEMENT_BG_COL"]
+        settings.ELEMENT_BG_COL = prev
         settings.OUTLINE_ENABLED = True
         cls.end()
-        slideshow = _base(id,"slideshow",False,False,(0,0),(0,0),(0,0),_EMPTY_R,_EMPTY_R)
+        rel,abs = _get_pos()
+        slideshow = _base(id,"slideshow",False,False,__cont["size"],__cont["abs"],__cont["rel"],_EMPTY_R,_EMPTY_R)
         slideshow["surface_index"] = index
         _Stack.add_element(slideshow)
         return surface
     
     @classmethod
-    def dropdown(cls, id:Any, options:list[str], start_option:str, min_width:int=0, min_option_height:int = 30)->tuple[str,bool]:
+    def dropdown(cls, id:str, options:list[str], start_option:str, min_width:int=0, min_option_height:int = 30, min_btn_size=(0,0))->tuple[str,bool]:
         """A dropdown element. Return a tuple with the currently selected option and whether the options are showing"""
         _Stack.win_check()
         isopen, option = False, start_option
         if id in _Stack.memory:
             isopen = (olddd:=_Stack.memory[id])["isopen"]
             option = olddd["option"]
-        if cls.button(f"{id}_option_btn",option): isopen = not isopen
+        if cls.button(f"{id}_option_btn",option,min_btn_size): isopen = not isopen
+        __button = _Stack.last_element
         w = _Stack.last_element["sx"]-settings.MARGIN
         option_height = _Stack.last_element["sy"]
+        settings.set_previous()
         settings.MARGIN = 0
         if cls.place_side().button(f"{id}_arrow_btn","▲" if isopen else "▼"): isopen = not isopen
-        settings.MARGIN = settings.defaults["MARGIN"]
+        settings.MARGIN = settings.previous["MARGIN"]
         w += _Stack.last_element["sx"]
         if w < min_width: w = min_width
         if option_height < min_option_height: option_height = min_option_height
         toth = option_height*len(options) + settings.MARGIN*(len(options)+1)
         if isopen:
+            settings.Y_MARGIN = 0
             cls.ignore_pos().place_above().container(f"{id}_options_cont",(w,toth),True,True)
             settings.OUTLINE_COL = settings.ELEMENT_BG_COL
             settings.CORNER_RADIUS = 0
@@ -245,16 +259,16 @@ class damgui:
                 if i > 0: settings.Y_MARGIN = settings.MARGIN
                 if cls.button(f"{id}_option_{i}",opt,(w-settings.MARGIN,option_height),"center",True): option, isopen = opt, False
             cls.end()
-            settings.Y_MARGIN = settings.defaults["Y_MARGIN"]
-            settings.OUTLINE_COL = settings.defaults["OUTLINE_COL"]
-            settings.CORNER_RADIUS = settings.defaults["CORNER_RADIUS"]
-        dd = _base(id,"dropdown",False,False,(0,0),(0,0),(0,0),_EMPTY_R,_EMPTY_R,None,None,"",True,True,False,False)
+            settings.Y_MARGIN = settings.previous["Y_MARGIN"]
+            settings.OUTLINE_COL = settings.previous["OUTLINE_COL"]
+            settings.CORNER_RADIUS = settings.previous["CORNER_RADIUS"]
+        dd = _base(id,"dropdown",False,False,(w,option_height),__button["abs"],__button["rel"],_EMPTY_R,_EMPTY_R,None,None,"",True,True,False,False)
         dd["isopen"], dd["option"] = isopen, option
         _Stack.add_element(dd)
         return option, isopen
     
     @classmethod
-    def selection_list(cls, id:Any, options:list[str], multi_select:bool=False, size:_IntIterable2D=(0,30), auto_height:bool=True)->str|list[str]:
+    def selection_list(cls, id:str, options:list[str], multi_select:bool=False, size:_IntIterable2D=(0,30), auto_height:bool=True)->str|list[str]:
         """A selection list element. Depending on the multi_select flag return either the selected option or selected options.
         If auto_height is set to True, the y component of size will be used as the element height"""
         _Stack.win_check()
@@ -266,6 +280,8 @@ class damgui:
         orisize = size
         if auto_height: size = (size[0],size[1]*len(options)+settings.Y_MARGIN*2)
         cls.container(f"{id}_options_cont",size)
+        __cont = _Stack.last_element
+        settings.set_previous()
         settings.OUTLINE_COL = settings.ELEMENT_BG_COL
         settings.CORNER_RADIUS = 0
         for i, opt in enumerate(options):
@@ -286,37 +302,55 @@ class damgui:
             if not multi_select:
                 if optionid not in optionbtns: optionbtns.append(optionid)
         cls.end()
-        settings.Y_MARGIN = settings.defaults["Y_MARGIN"]
-        settings.OUTLINE_COL = settings.defaults["OUTLINE_COL"]
-        settings.CORNER_RADIUS = settings.defaults["CORNER_RADIUS"]
-        sl = _base(id,"selection_list",False,False,(0,0),(0,0),(0,0),_EMPTY_R,_EMPTY_R,None,None,"",False,False,False,False)
+        settings.Y_MARGIN = settings.previous["Y_MARGIN"]
+        settings.OUTLINE_COL = settings.previous["OUTLINE_COL"]
+        settings.CORNER_RADIUS = settings.previous["CORNER_RADIUS"]
+        sl = _base(id,"selection_list",False,False,__cont["size"],__cont["abs"],__cont["rel"],_EMPTY_R,_EMPTY_R,None,None,"",False,False,False,False)
         sl["option"], sl["options"], sl["optionbtns"] = seloption, seloptions, optionbtns
         _Stack.add_element(sl)
         return seloption if not multi_select else seloptions
     
     @classmethod
-    def slider(cls, id:Any, width:int, direction:str="horizontal", thicness:int=15, start_rel:float = 0.5, handle_size:int=30)->float:
+    def slider(cls, id:str, width:int, direction:str="horizontal", thickness:int=15, start_rel:float = 0.5, handle_size:int=30)->float:
         """A slider element. Can be horizontal or vertical and higly customizable. Return a value between 0-1 representing the percentage the handle is on"""
         _Stack.win_check()
         if direction not in ("horizontal","vertical","h","v"): raise DamGUIException("Supported directions for sliders are 'horizontal', 'vertical', 'h', 'v'")
         if direction == "h": direction = "horizontal"
         handle_pos = (start_rel*width)-handle_size//2
         if id in _Stack.memory: handle_pos = _Stack.memory[id]["handle_pos"]
-        size = (width,thicness) if direction == "horizontal" else (thicness,width)
-        rel, abs, rect, absrect = _get_basic(size,offset:=((handle_size//2,handle_size//2-thicness//2) if direction =="horizontal" else (handle_size//2-thicness//2,handle_size//2)))
+        size = (width,thickness) if direction == "horizontal" else (thickness,width)
+        rel, abs, rect, absrect = _get_basic(size,offset:=((handle_size//2,handle_size//2-thickness//2) if direction =="horizontal" else (handle_size//2-thickness//2,handle_size//2)))
         slider = _base(id,"slider",True,True,size,abs,rel,rect,absrect,None,None,"",False,False,True,False,offset)
         _Stack.add_element(slider)
+        __prevcr = settings.CORNER_RADIUS
         settings.CORNER_RADIUS = handle_size//2
-        cls.custom_pos((rel[0]+handle_pos,rel[1]-handle_size//2+thicness//2) if direction == "horizontal" else (rel[0]-handle_size//2+thicness//2,rel[1]+handle_pos))
+        cls.custom_pos((rel[0]+handle_pos,rel[1]-handle_size//2+thickness//2) if direction == "horizontal" else (rel[0]-handle_size//2+thickness//2,rel[1]+handle_pos))
         cls.button(f"{id}_handle_btn","",(handle_size,handle_size))
-        if _Stack.last_element["unhover_press"] and _Stack.last_element["canrenderpress"]:
+        if _Stack.last_element["unhover_press"]:
             if direction == "horizontal": handle_pos += _Stack.mouserel[0]
             else: handle_pos += _Stack.mouserel[1]
             if handle_pos < -handle_size//2: handle_pos = -handle_size//2
             elif handle_pos > width-handle_size//2: handle_pos = width-handle_size//2
         slider["handle_pos"] = handle_pos
-        settings.CORNER_RADIUS = settings.defaults["CORNER_RADIUS"]
+        settings.CORNER_RADIUS = __prevcr
         return (handle_pos+handle_size//2)/width
+    
+    @classmethod
+    def auto_scroll(cls, container_id:str, scroll_amount:float=0.5, direction:str="vertical")->bool:
+        """The scrollbar of a selected container will be placed at a chosen percentage. scroll_amount is clamped 0-1. Return whether the new scrollbar position is different"""
+        scroll_amount = pygame.math.clamp(scroll_amount,0.0,1.0)
+        if direction == "h": direction = "horizontal"
+        if direction == "v": direction = "vertical"
+        if direction not in ("horizontal","vertical"): raise DamGUIException(f"Can only scroll in either vertical or orizontal directions, not '{direction}'")
+        if not container_id in _Stack.memory: raise DamGUIException(f"No container exists of id '{container_id}' to scroll in")
+        scrollbar_id = f"{container_id}_scrollbar_{direction}"
+        if not scrollbar_id in _Stack.memory:
+            warnings.warn(f"The scrollbar of container '{container_id}' with direction '{direction}' does not exist, no scrolling has been applied")
+            return False
+        scrollbar = _Stack.memory[scrollbar_id]
+        previouspos = scrollbar["handle_pos"]
+        scrollbar["handle_pos"] = (scrollbar["width"]-scrollbar["handle_size"])*scroll_amount
+        return scrollbar["handle_pos"] != previouspos
     
     @staticmethod
     def frame_start()->None:
@@ -326,6 +360,7 @@ class damgui:
         _Stack.mousepos,_Stack.mouserel = pygame.mouse.get_pos(), pygame.mouse.get_rel()
         _Stack.mousepressed, _Stack.keypressed = pygame.mouse.get_pressed(), pygame.key.get_pressed()
         _Stack.start_called = True
+        _Stack.element_num = 0
         
     @staticmethod
     def register_event(event:pygame.event.Event)->None:
@@ -379,7 +414,7 @@ class damgui:
         
     @staticmethod
     def last_data()->dict[str,Any]:
-        """Return damgui.element_data() for the last created element"""
+        """Return the data in memory for the last created element"""
         if not _Stack.last_element: raise DamGUIException("An element must be created to get its data")
         return _Stack.last_element
     
@@ -407,7 +442,57 @@ class damgui:
         _Stack.place_top = True
         return cls
     
-    @staticmethod
-    def get_stack()->_Stack:
-        """Return the stack. Caution (its not meant to be used by the user)"""
+    @classmethod
+    @property
+    def stack(cls)->_Stack:
+        """The stack. Caution (its not meant to be used by the user)"""
         return _Stack
+    
+    @classmethod
+    @property
+    def element_count(cls)->int:
+        """How many elements have been created so far in the frame"""
+        return _Stack.element_num
+    
+def _scrollbar(direction, win, id):
+    """An internal element to allow scolling on containers"""
+    THICNESS = settings.SCROLLBAR_THICKNESS
+    id = f"{id}_scrollbar_{direction}"
+    handle_pos = 0
+    if id in _Stack.memory: handle_pos = _Stack.memory[id]["handle_pos"]
+    if direction == "horizontal":
+        size = (win["size"][0]-THICNESS-settings.MARGIN*4,THICNESS)
+        rel = (settings.MARGIN*2,win["size"][1]-settings.MARGIN-THICNESS)
+        width = size[0]
+    else:
+        size = (THICNESS,win["size"][1]-settings.MARGIN*2)
+        rel = (win["size"][0]-settings.MARGIN-THICNESS,settings.MARGIN)
+        width = size[1]
+    sizetouse,realsizetouse = (win["size"][0],win["realsize"][0]) if direction == "horizontal" else (win["size"][1],win["realsize"][1])
+    handle_size = (width*sizetouse)/realsizetouse
+    abs = (win["pos"][0]+rel[0],win["pos"][1]+rel[1])
+    scov = (handle_pos*realsizetouse)/width
+    if direction == "horizontal":
+        scrolloffset = (scov,win["scoy"])
+        handle_position = (rel[0]+handle_pos,rel[1])
+        button_size = (handle_size,THICNESS)
+    else:
+        scrolloffset = (win["scox"],scov)
+        handle_position = (rel[0],rel[1]+handle_pos)
+        button_size = (THICNESS,handle_size)
+    scrollbar = _base(id,"scrollbar",True,True,size,abs,rel,pygame.Rect(rel,size),pygame.Rect(rel,size),None,None,"",False,False,True)
+    damgui.ignore_pos().place_above()
+    _Stack.add_element(scrollbar)
+    win["scrolloffset"] = scrolloffset
+    win["scox"] = scrolloffset[0]
+    win["scoy"] = scrolloffset[1]
+    damgui.ignore_pos().place_above().custom_pos(handle_position)
+    damgui.button(f"{id}_handle","",button_size,force_size=True)
+    if _Stack.last_element["unhover_press"]:
+        if direction == "horizontal": handle_pos += _Stack.mouserel[0]
+        else: handle_pos += _Stack.mouserel[1]
+        if handle_pos < 0: handle_pos = 0
+        if handle_pos > width-handle_size: handle_pos = width-handle_size
+    scrollbar["handle_pos"] = handle_pos
+    scrollbar["width"] = width
+    scrollbar["handle_size"] = handle_size

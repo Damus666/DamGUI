@@ -37,7 +37,7 @@ def _get_pos(offset=(0,0)):
     rel = (rel[0]+offset[0],rel[1]+offset[1])
     return rel, (winpos[0]+rel[0],winpos[1]+rel[1])
     
-def _base(id,type,bg,outline,size,abs,rel,rect,absrect,tsurf=None,trect=None,text="",canpress=True,canhover=True,darkbg=False,surfbg=False,offset=(0,0)):
+def _base(id,type,bg,outline,size,abs,rel,rect,absrect,tsurf=None,trect=None,text="",canpress=True,canhover=True,darkbg=False,surfbg=False,offset=(0,0),scrolloffset=(0,0)):
     el = {
         "id":id,
         "type":type,
@@ -74,6 +74,9 @@ def _base(id,type,bg,outline,size,abs,rel,rect,absrect,tsurf=None,trect=None,tex
         "parent":Stack.window,
         "canrenderpress":True,
         "press_allow":Stack.was_allowed(id),
+        "scrolloffset":scrolloffset,
+        "scox":scrolloffset[0],
+        "scoy":scrolloffset[1],
     }
     if el["pressed"] or (id in Stack.memory and Stack.memory[id]["unhover_press"]): el["unhover_press"] = True
     if not Stack.mousepressed[0]: el["unhover_press"] = False

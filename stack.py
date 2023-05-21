@@ -6,7 +6,7 @@ class Stack:
     mousepressed = keypressed = custom_pos = last_element = window = None
     place_side = place_top = ignore_pos = start_called = False
     pressed_last_frame = False
-    last_row_y = 0
+    element_num = last_row_y = 0
     
     @classmethod
     def add_window(cls, win):
@@ -23,6 +23,7 @@ class Stack:
             if old: old["topelements"].append(win)
         cls.custom_pos, cls.ignore_pos, cls.place_top, cls.place_side = None, False, False, False
         cls.last_row_y = -settings.MARGIN
+        cls.element_num += 1
         
     @classmethod
     def remove_last(cls):
@@ -49,7 +50,8 @@ class Stack:
     @classmethod
     def get_rel(cls):
         if cls.custom_pos: return cls.custom_pos
-        x = y = 0
+        x = -cls.window["scox"]
+        y = -cls.window["scoy"]
         for el in cls.window["elements"]:
             if (newy:=(el["ry"]+el["sy"]+el["oy"])) > y and not el["ignorepos"]: y = newy if not cls.place_side else el["ry"]
         if cls.place_side:
@@ -70,6 +72,7 @@ class Stack:
             el["placetop"] = True
             cls.window["topelements"].append(el)
         cls.custom_pos, cls.ignore_pos, cls.place_top = None, False, False
+        cls.element_num += 1
     
     @classmethod
     def hovering(cls, rect, parent=None):
