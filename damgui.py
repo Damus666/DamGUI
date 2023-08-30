@@ -2,7 +2,7 @@ import pygame, warnings
 pygame.init()
 from .stack import Stack as _Stack
 from .render import render_all as _render_all
-from .base import _render_text,_size_minsize_surf,_base,_relative_rect_pos, _get_basic, _get_pos, _EMPTY_R, _ColorValue
+from .base import _render_text,_size_minsize_surf,_base,_relative_rect_pos, _get_basic, _get_pos, _get_dict, _EMPTY_R, _ColorValue
 from .constants import settings, DamGUIException
 from typing import Any, Self
 
@@ -11,8 +11,12 @@ settings.init()
 
 class damgui:
     """Easly creates UI elements at runtime"""
+    
+    ###### ELEMENTS ######
+    
     @classmethod
-    def begin(cls, id:str, title:str, pos:_IntIterable2D, min_size:_IntIterable2D, can_drag:bool=True, relative_pos:bool=False,auto_size:bool=True,can_scroll:bool=True)->None:
+    def begin(cls, id:str, title:str, pos:_IntIterable2D, min_size:_IntIterable2D,\
+        can_drag:bool=True, relative_pos:bool=False,auto_size:bool=True,can_scroll:bool=True,dark_bg:bool=True)->None:
         """Create a window context or a container depending on the parameters. Must end it with damgui.end(). A window will auto-resize based on the content"""
         _Stack.start_check()
         type_ = "window"
@@ -23,14 +27,14 @@ class damgui:
         else: surf = pygame.Surface((min_size[0]-settings.MARGIN,min_size[1]-settings.Y_MARGIN),pygame.SRCALPHA)
         surf.fill(0)
         if relative_pos and _Stack.window:
-            rel = _Stack.get_rel()
+            rel = _Stack.get_rel(size)
             winpos = _Stack.window["pos"] if _Stack.window else (0,0)
             abs = (rel[0]+winpos[0],rel[1]+winpos[1])
             type_ = "container"
         if id in _Stack.memory and (type_ == "window" or auto_size): size = _Stack.memory[id]["size"]
         if type_ == "container" and surf.get_size() != size:
             surf = pygame.Surface((size[0]-settings.MARGIN,size[1]-settings.MARGIN),pygame.SRCALPHA)
-        win = _base(id, type_,True,True,size,abs,rel,pygame.Rect(rel,size),pygame.Rect(abs,size),None,None,title,True,True,True,scrolloffset=scrolloffset)
+        win = _base(id, type_,True,True,size,abs,rel,pygame.Rect(rel,size),pygame.Rect(abs,size),None,None,title,True,True,dark_bg,scrolloffset=scrolloffset)
         win.update({
             "title":title,
             "pos":abs,
@@ -63,7 +67,91 @@ class damgui:
     def end()->None:
         """Close the last opened context"""
         _Stack.remove_last()
-        
+    
+    @classmethod
+    def entry_line(cls, id:str, size:_IntIterable2D, blink_time:int=400, placeholder:str="Insert text...", start_text:str="")->str:
+        """An entryline element. Return the current text. Get more info with damgui.entryline_events()"""
+        text, showing_text, cursor_idx, text_surf, focused = start_text,"",len(start_text),None,False
+        cursor_on, last_blink, char_offset = True, 0, 0
+        if id in _Stack.memory:
+            oldel = _Stack.memory[id]
+            text, showing_text, cursor_idx, text_surf, focused, cursor_on, last_blink, char_offset = \
+                _get_dict(oldel,"text","showing_text","cursor_idx","text_surf","focused","cursor_on","last_blink","char_offset")
+        oldtext = text
+        was_clicking = _Stack.was_clicking(id)
+        cls.container(f"{id}_cont",size,True,False,False,False)
+        __cont = _Stack.last_element
+        hastoshow = showing_text and showing_text != "|"
+        if not hastoshow and cursor_idx == 0:
+            hastoshow = True
+        if not hastoshow:
+            __prevtextcol = settings.TEXT_COL
+            settings.TEXT_COL = (150,150,150)
+        cls.label(f"{id}_label",showing_text if showing_text else placeholder)
+        if not hastoshow:
+            settings.TEXT_COL = __prevtextcol
+        cls.end()
+        entryline = _base(id, "entry_line",False,True,size,__cont["abs"],__cont["rel"],pygame.Rect(__cont["rel"],size),pygame.Rect(__cont["abs"],size),None,None,text)
+        action = entryline["pressed"] and (not was_clicking and not _Stack.pressed_last_frame)
+        if action: entryline["press_allow"] = True; focused = True
+        if _Stack.mousepressed[0] and not entryline["hovering"]: focused = False
+        if not _Stack.mousepressed[0]: entryline["press_allow"] = False
+        ### logic
+        if focused:
+            for event in _Stack.events:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_LEFT:
+                        if cursor_idx > 0:
+                            cursor_idx -= 1
+                    elif event.key == pygame.K_RIGHT:
+                        if cursor_idx < len(text):
+                            cursor_idx += 1
+                    elif event.key == pygame.K_BACKSPACE:
+                        if cursor_idx > 0:
+                            left = text[0:cursor_idx]
+                            right = text[cursor_idx:]
+                            text = left[0:-1]+right
+                            cursor_idx -= 1
+                    elif event.key == pygame.K_DELETE:
+                        if cursor_idx < len(text):
+                            left = text[0:cursor_idx]
+                            right = text[cursor_idx:]
+                            text = left+right[1:]
+                    elif event.unicode:
+                        left = text[0:cursor_idx]
+                        right = text[cursor_idx:]
+                        text = left + event.unicode + right
+                        cursor_idx += 1
+        ###
+        actual_text = text[char_offset:]
+        if cursor_on and focused:
+            if cursor_idx-char_offset <= 0:
+                char_offset -= 5
+                if char_offset < 0: char_offset = 0
+            left = actual_text[0:(cursor_idx-char_offset)]
+            right = actual_text[(cursor_idx-char_offset):]
+            showing_text = left + "|"+ right
+            if settings.FONT.size(left)[0] > size[0]-(settings.MARGIN*4):
+                char_offset += 2
+        else:
+            showing_text = actual_text
+        if pygame.time.get_ticks()-last_blink >= blink_time:
+            cursor_on = not cursor_on
+            last_blink = pygame.time.get_ticks()
+        entryline.update({
+            "text":text,
+            "showing_text":showing_text,
+            "cursor_idx":cursor_idx,
+            "text_surf":text_surf,
+            "focused":focused,
+            "cursor_on":cursor_on,
+            "last_blink":last_blink,
+            "char_offset":char_offset,
+            "oldtext":oldtext,
+        })
+        _Stack.add_element(entryline)
+        return text
+    
     @staticmethod
     def button(id:str, text:str, min_size:_IntIterable2D=(0,0), text_pos:str="center", force_size:bool=False)->bool:
         """Create a button element. Return whether the button has been clicked"""
@@ -84,10 +172,12 @@ class damgui:
         return action
     
     @staticmethod
-    def image_button(id:str, surface:pygame.Surface):
+    def image_button(id:str, surface:pygame.Surface, min_size:_IntIterable2D=(0,0)):
         _Stack.win_check()
         surfsize = surface.get_size()
         size = (surfsize[0]+settings.PADDING*2,surfsize[1]+settings.PADDING*2)
+        if size[0] < min_size[0]: size = (min_size[0],size[1])
+        if size[1] < min_size[1]: size = (size[0],min_size[1])
         rel,abs,rect,absrect = _get_basic(size)
         was_clicking = _Stack.was_clicking(id)
         btn = _base(id,"image_button",True,True,size,abs,rel,rect,absrect,surface,surface.get_rect(center=rect.center))
@@ -96,6 +186,22 @@ class damgui:
         if action: btn["press_allow"] = True
         if not _Stack.mousepressed[0]: btn["press_allow"] = False
         return action
+    
+    @staticmethod
+    def select_image_button(id:str, surface:pygame.Surface):
+        """A button element that once pressed stays like so until it's pressed again. Return whether it's in the pressed state"""
+        _Stack.win_check()
+        surfsize = surface.get_size()
+        size = (surfsize[0]+settings.PADDING*2,surfsize[1]+settings.PADDING*2)
+        rel,abs,rect,absrect = _get_basic(size)
+        btn = _base( id,"select_button",True,True,size,abs,rel,rect,absrect,surface,surface.get_rect(center=rect.center))
+        btn["selected"] = _Stack.was_selected(id)
+        was_clicking = _Stack.was_clicking(id)
+        _Stack.add_element(btn)
+        action_true = btn["pressed"] and (not was_clicking and not _Stack.pressed_last_frame)
+        if action_true: btn["selected"] = not btn["selected"]; btn["press_allow"] = True
+        if not _Stack.mousepressed[0]: btn["press_allow"] = False
+        return btn["selected"]
     
     @staticmethod
     def select_button(id:str,text:str,min_size:_IntIterable2D=(0,0), text_pos:str="center",force_size:bool=False)->bool:
@@ -119,12 +225,13 @@ class damgui:
         return btn["selected"]
     
     @staticmethod
-    def checkbox(id:str, size:_IntIterable2D)->bool:
+    def checkbox(id:str, size:_IntIterable2D, start_selection=False)->bool:
         """A damgui.select_button with a special UI"""
         _Stack.win_check()
         rel,abs,rect,absrect = _get_basic(size)
         btn = _base( id,"checkbox",True,True,size,abs,rel,rect,absrect,None,None,"")
         btn["selected"] = _Stack.was_selected(id)
+        if not id in _Stack.memory: btn["selected"] = start_selection
         btn["innerrect"] = rect.inflate(-settings.PADDING*2,-settings.PADDING*2)
         was_clicking = _Stack.was_clicking(id)
         _Stack.add_element(btn)
@@ -167,24 +274,24 @@ class damgui:
         _Stack.add_element(_base(id,"label",False,False,size,abs,rel,rect,absrect,tsurf,_relative_rect_pos(tsurf,rect,text_pos),text))
         
     @classmethod
-    def container(cls,id:str, size:_IntIterable2D, outline:bool=True, auto_size:bool=False, can_scroll:bool=True)->None:
+    def container(cls,id:str, size:_IntIterable2D, outline:bool=True, auto_size:bool=False, can_scroll:bool=True,dark_bg:bool=True)->None:
         """Creates a container context. Must be closed with damgui.end()"""
         _Stack.win_check()
-        cls.begin(id,"",(0,0),size,False,True,auto_size,can_scroll)
+        cls.begin(id,"",(0,0),size,False,True,auto_size,can_scroll,dark_bg)
         if not outline: _Stack.last_element["outline"] = False
         
     @staticmethod
     def separator(size:_IntIterable2D)->None:
         """Creates empty space of custom size"""
         _Stack.win_check()
-        rel,abs = _get_pos()
+        rel,abs = _get_pos(size)
         _Stack.add_element(_base(None,"separator",False,False,size,abs,rel,pygame.Rect(rel,size),pygame.Rect(abs,size),None,None,""))
         
     @staticmethod
     def line(length:int,thickness:int,separator_height)->None:
         """Creates a line separator of custom size"""
         _Stack.win_check()
-        rel,abs = _get_pos()
+        rel,abs = _get_pos((length,separator_height))
         rect = pygame.Rect(rel[0],rel[1]+separator_height//2,length,thickness)
         line = _base(None,"line",True,False,(length,separator_height),abs,rel,rect,pygame.Rect(abs,rect.size),None,None,"")
         line["hovering"] = True
@@ -201,11 +308,12 @@ class damgui:
         settings.CORNER_RADIUS = settings.defaults["CORNER_RADIUS"]
         
     @classmethod
-    def slideshow(cls,id:str, surfaces:list[pygame.Surface], fancy_arrows:bool=False)->pygame.Surface:
-        """Implements 2 buttons to go through a list of images. Return the currently displaying image"""
+    def slideshow(cls,id:str, surfaces:list[pygame.Surface], fancy_arrows:bool=False, start_index:int=0)->tuple[pygame.Surface,int]:
+        """Implements 2 buttons to go through a list of images. Return the currently displaying image and index"""
         if (surfaces_len:=len(surfaces)) <= 0: raise DamGUIException("'surfaces' parameter of damgui.slide_show() must be a non-empty sequence")
         index = 0
         if id in _Stack.memory: index = _Stack.memory[id]["surface_index"]
+        else: index = start_index
         if surfaces_len <= index: index = surfaces_len-1
         surface = surfaces[index]
         sizes = surface.get_size()
@@ -224,11 +332,10 @@ class damgui:
         settings.ELEMENT_BG_COL = prev
         settings.OUTLINE_ENABLED = True
         cls.end()
-        rel,abs = _get_pos()
         slideshow = _base(id,"slideshow",False,False,__cont["size"],__cont["abs"],__cont["rel"],_EMPTY_R,_EMPTY_R)
         slideshow["surface_index"] = index
         _Stack.add_element(slideshow)
-        return surface
+        return surface, index
     
     @classmethod
     def dropdown(cls, id:str, options:list[str], start_option:str, min_width:int=0, min_option_height:int = 30, min_btn_size=(0,0))->tuple[str,bool]:
@@ -238,6 +345,7 @@ class damgui:
         if id in _Stack.memory:
             isopen = (olddd:=_Stack.memory[id])["isopen"]
             option = olddd["option"]
+        __wascenterx = _Stack.place_centerx
         if cls.button(f"{id}_option_btn",option,min_btn_size): isopen = not isopen
         __button = _Stack.last_element
         w = _Stack.last_element["sx"]-settings.MARGIN
@@ -249,10 +357,12 @@ class damgui:
         w += _Stack.last_element["sx"]
         if w < min_width: w = min_width
         if option_height < min_option_height: option_height = min_option_height
-        toth = option_height*len(options) + settings.MARGIN*(len(options)+1)
+        toth = option_height*len(options) + settings.MARGIN*(len(options)+2)
         if isopen:
             settings.Y_MARGIN = 0
+            if __wascenterx: cls.place_centerx()
             cls.ignore_pos().place_above().container(f"{id}_options_cont",(w,toth),True,True)
+            settings.Y_MARGIN = settings.previous["Y_MARGIN"]
             settings.OUTLINE_COL = settings.ELEMENT_BG_COL
             settings.CORNER_RADIUS = 0
             for i, opt in enumerate(options):
@@ -335,8 +445,10 @@ class damgui:
         settings.CORNER_RADIUS = __prevcr
         return (handle_pos+handle_size//2)/width
     
-    @classmethod
-    def auto_scroll(cls, container_id:str, scroll_amount:float=0.5, direction:str="vertical")->bool:
+    ###### EXTRA ######
+    
+    @staticmethod
+    def auto_scroll(container_id:str, scroll_amount:float=0.5, direction:str="vertical")->bool:
         """The scrollbar of a selected container will be placed at a chosen percentage. scroll_amount is clamped 0-1. Return whether the new scrollbar position is different"""
         scroll_amount = pygame.math.clamp(scroll_amount,0.0,1.0)
         if direction == "h": direction = "horizontal"
@@ -351,6 +463,25 @@ class damgui:
         previouspos = scrollbar["handle_pos"]
         scrollbar["handle_pos"] = (scrollbar["width"]-scrollbar["handle_size"])*scroll_amount
         return scrollbar["handle_pos"] != previouspos
+    
+    @staticmethod
+    def entryline_set_text(entryline_id:str, text:str)->None:
+        """Sets the text of a specific entry line"""
+        if not entryline_id in _Stack.memory: raise DamGUIException(f"No entryline exists of id '{entryline_id}' to change the text of")
+        _Stack.memory[entryline_id]["text"] = text
+        _Stack.memory[entryline_id]["cursor_idx"] = len(text)
+        
+    @staticmethod
+    def entryline_events(entryline_id:str)->dict[str,bool|int]:
+        """Return a dictionary with increased, decreased and changed flag (plus the cursor index) for an entryline"""
+        if not entryline_id in _Stack.memory: raise DamGUIException(f"No entryline exists of id '{entryline_id}' to get events of")
+        len_text,len_oldtext = len((entryline:=_Stack.memory[entryline_id])["text"]),len(entryline["oldtext"])
+        return {
+            "increased":len_text > len_oldtext,
+            "decreased":len_text < len_oldtext,
+            "changed": len_text != len_oldtext,
+            "cursor":entryline["cursor_idx"]
+        }
     
     @staticmethod
     def frame_start()->None:
@@ -443,6 +574,12 @@ class damgui:
         return cls
     
     @classmethod
+    def place_centerx(cls)->Self:
+        """The next element will be placed centered on the x of the current context"""
+        _Stack.place_centerx = True
+        return cls
+    
+    @classmethod
     @property
     def stack(cls)->_Stack:
         """The stack. Caution (its not meant to be used by the user)"""
@@ -453,6 +590,12 @@ class damgui:
     def element_count(cls)->int:
         """How many elements have been created so far in the frame"""
         return _Stack.element_num
+    
+    @classmethod
+    @property
+    def last_id(cls)->str:
+        """The ID of the last element"""
+        return _Stack.last_element["id"]
     
 def _scrollbar(direction, win, id):
     """An internal element to allow scolling on containers"""

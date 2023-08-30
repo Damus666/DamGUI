@@ -33,7 +33,7 @@ def render_window(surface, window):
     sx,sy = window["minsize"]
     scox,scoy = window["scrolloffset"]
     realx, realy = window["size"]
-    if window["can_scroll"]:
+    if window["can_scroll"] or window["autosize"]:
         for el in window["elements"]:
             er = el["rx"]+el["sx"]
             eb = el["ry"]+el["sy"]
@@ -49,7 +49,7 @@ def render_window(surface, window):
             window["absrect"].size = window["rect"].size
             window["size"] = window["rect"].size
             if window["surf"].get_size() != (sx,sy): window["surf"] = pygame.Surface((sx-conf["MARGIN"],sy-conf["Y_MARGIN"]),pygame.SRCALPHA)
-    pygame.draw.rect(surface,conf["WINDOW_BG_COL"],window["rect"],0,conf["CORNER_RADIUS"])
+    if window["bg"]: pygame.draw.rect(surface,conf["WINDOW_BG_COL"] if window["darkbg"] else conf["ELEMENT_BG_COL"],window["rect"],0,conf["CORNER_RADIUS"])
     for el in window["elements"]:
         render_element(window["surf"],el)
     surface.blit(window["surf"],window["rect"])

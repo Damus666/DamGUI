@@ -27,13 +27,17 @@ def _relative_rect_pos(surf ,rect, posname):
     return surf.get_rect(**{posname:pos})
 
 def _get_basic(size, offset=(0,0)):
-    winpos, rel = Stack.window["pos"], Stack.get_rel()
+    winpos, rel = Stack.window["pos"], Stack.get_rel(size)
     rel = (rel[0]+offset[0],rel[1]+offset[1])
     abs = (winpos[0]+rel[0],winpos[1]+rel[1])
     return rel, abs, pygame.Rect(rel,size), pygame.Rect(abs,size)
 
-def _get_pos(offset=(0,0)):
-    winpos, rel = Stack.window["pos"], Stack.get_rel()
+def _get_dict(dict, *names):
+    for name in names:
+        yield dict[name]
+
+def _get_pos(size=(0,0), offset=(0,0)):
+    winpos, rel = Stack.window["pos"], Stack.get_rel(size)
     rel = (rel[0]+offset[0],rel[1]+offset[1])
     return rel, (winpos[0]+rel[0],winpos[1]+rel[1])
     
@@ -41,7 +45,7 @@ def _base(id,type,bg,outline,size,abs,rel,rect,absrect,tsurf=None,trect=None,tex
     el = {
         "id":id,
         "type":type,
-        "bg":bg,
+        "bg":bg if settings.BG_ENABLED else False,
         "darkbg":darkbg,
         "outline":outline if settings.OUTLINE_ENABLED else False,
         "size":size,

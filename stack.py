@@ -4,7 +4,7 @@ class Stack:
     windows, window_history, events, memory = [],[],[],{}
     mousepos, mouserel = (0,0), (0,0)
     mousepressed = keypressed = custom_pos = last_element = window = None
-    place_side = place_top = ignore_pos = start_called = False
+    place_side = place_top = ignore_pos = start_called = place_centerx = False
     pressed_last_frame = False
     element_num = last_row_y = 0
     
@@ -21,7 +21,7 @@ class Stack:
         if cls.place_top:
             win["placetop"] = True
             if old: old["topelements"].append(win)
-        cls.custom_pos, cls.ignore_pos, cls.place_top, cls.place_side = None, False, False, False
+        cls.custom_pos, cls.ignore_pos, cls.place_top, cls.place_side, cls.place_centerx = None, False, False, False, False
         cls.last_row_y = -settings.MARGIN
         cls.element_num += 1
         
@@ -48,7 +48,7 @@ class Stack:
         if not cls.start_called: raise DamGUIException("damgui.frame_start() must be called before creating elements")
         
     @classmethod
-    def get_rel(cls):
+    def get_rel(cls, size=(0,0)):
         if cls.custom_pos: return cls.custom_pos
         x = -cls.window["scox"]
         y = -cls.window["scoy"]
@@ -59,6 +59,8 @@ class Stack:
                 if el["ry"] == y and (newx:=(el["rx"]+el["sx"]+el["ox"])) > x and not el["ignorepos"]: x = newx
             y = cls.last_row_y
         else: cls.last_row_y = y
+        if not cls.place_side and cls.place_centerx:
+            x = (cls.window["realsize"][0]//2)-cls.window["scox"]-size[0]//2
         return x+settings.MARGIN,y+settings.Y_MARGIN
     
     @classmethod
@@ -71,7 +73,7 @@ class Stack:
         if cls.place_top:
             el["placetop"] = True
             cls.window["topelements"].append(el)
-        cls.custom_pos, cls.ignore_pos, cls.place_top = None, False, False
+        cls.custom_pos, cls.ignore_pos, cls.place_top, cls.place_centerx = None, False, False, False
         cls.element_num += 1
     
     @classmethod

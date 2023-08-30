@@ -10,8 +10,45 @@ class settings:
         'on_hover': (101, 0, 171),
         "dark":(31,0,61),
         "on_press":(45,0,75),
-        "outline":(67, 0, 127),
-        "checkbox_inside":"purple",
+        "outline":(67, 0, 137),
+        "checkbox":"purple",
+        "text":"white",
+    }
+    GREEN_THEME = {
+        "normal":(0,78,18),
+        "dark":(0,35,8),
+        "on_hover":(0,115,35),
+        "on_press":(0,58,14),
+        "outline":(0,95,20),
+        "checkbox":(0,255,155),
+        "text":"white",
+    }
+    BLUE_THEME = {
+        "dark":(0,10,60),
+        "normal":(0,30,125),
+        "on_hover":(0,48,170),
+        "on_press":(0,20,105),
+        "outline":(0,50,145),
+        "checkbox":(0,100,255),
+        "text":"white",
+    }
+    RED_THEME = {
+        "dark":(55,0,0),
+        "normal":(115,0,0),
+        "on_hover":(155,0,0),
+        "on_press":(100,0,0),
+        "outline":(135,0,0),
+        "checkbox":(255,0,0),
+        "text":"white",
+    }
+    DARK_THEME = {
+        "dark":(20,20,20),
+        "normal":(30,30,30),
+        "on_hover":(40,40,40),
+        "on_press":(25,25,25),
+        "outline":(50,50,50),
+        "checkbox":(0,100,200),
+        "text":"white",
     }
     
     @classmethod
@@ -55,10 +92,11 @@ class settings:
         cls.WINDOW_BG_COL = (20,20,20)
         cls.ELEMENT_BG_COL = (30,30,30)
         cls.ELEMENT_HOVER_COL = (40,40,40)
-        cls.ELEMENT_PRESS_COL = (22,22,22)
+        cls.ELEMENT_PRESS_COL = (25,25,25)
         cls.OUTLINE_COL = (50,50,50)
         cls.CHECKBOX_COL = (0,100,200)
         cls.SCROLLBAR_THICKNESS = 10
+        cls.BG_ENABLED = True
         cls.previous = cls.copy()
         
     @classmethod
@@ -69,6 +107,7 @@ class settings:
     @classmethod
     def set_font_size(cls, size_name:str):
         """Set the current font using the font size. Changing settings.FONT directly is faster"""
+        cls.previous = cls.copy()
         match size_name.lower():
             case "xxs": cls.FONT = cls.FONT_XXS
             case "xs": cls.FONT = cls.FONT_XS
@@ -78,7 +117,7 @@ class settings:
             case "xl": cls.FONT = cls.FONT_XL
             case "xxl": cls.FONT = cls.FONT_XXL
             case "xxxxl": cls.FONT = cls.FONT_XXXXL
-        cls.previous = cls.copy()
+            case "default": cls.FONT = cls.FONT_M
             
     @classmethod
     def concise_style(cls)->None:
@@ -108,30 +147,45 @@ class settings:
         
     @classmethod
     def change_colors(cls, normal:_ColorValue=None, on_hover:_ColorValue=None, on_press:_ColorValue=None,
-                      dark:_ColorValue=None, outline:_ColorValue=None, checkbox_inside:_ColorValue= None)->None:
+                      dark:_ColorValue=None, outline:_ColorValue=None, checkbox:_ColorValue= None, text:_ColorValue=None)->None:
         """Changes the settings color for every argument that is not None"""
         if normal: cls.ELEMENT_BG_COL = normal
         if on_hover: cls.ELEMENT_HOVER_COL = on_hover
         if on_press: cls.ELEMENT_PRESS_COL = on_press
         if dark: cls.WINDOW_BG_COL = dark
         if outline: cls.OUTLINE_COL = outline
-        if checkbox_inside: cls.CHECKBOX_COL = checkbox_inside
+        if checkbox: cls.CHECKBOX_COL = checkbox
+        if text: cls.TEXT_COL = text
         cls.previous = cls.copy()
         
     @classmethod
-    def reset_colors(cls, normal:bool=True, on_hover:bool=True, on_press:bool=True, dark:bool=True, outline:bool=True, checkbox_inside:bool=True)->None:
+    def reset_colors(cls, normal:bool=True, on_hover:bool=True, on_press:bool=True, dark:bool=True, outline:bool=True, checkbox:bool=True,text:bool=True)->None:
         """Reset colors to default if its flag is set to true (default)"""
         if normal: cls.ELEMENT_BG_COL = settings.previous["ELEMENT_BG_COL"]
         if on_hover: cls.ELEMENT_HOVER_COL = settings.previous["ELEMENT_HOVER_COL"]
         if on_press: cls.ELEMENT_PRESS_COL = settings.previous["ELEMENT_PRESS_COL"]
         if dark: cls.WINDOW_BG_COL = settings.previous["WINDOW_BG_COL"]
         if outline: cls.OUTLINE_COL = settings.previous["OUTLINE_COL"]
-        if checkbox_inside: cls.CHECKBOX_COL = settings.previous["CHECKBOX_COL"]
+        if checkbox: cls.CHECKBOX_COL = settings.previous["CHECKBOX_COL"]
+        if text: cls.TEXT_COL = settings.previous["TEXT_COL"]
         
     @classmethod
     def color_theme(cls, theme_dict:dict[str,_ColorValue])->None:
         """Load the colors from a dict. Structure: {"color_name":<color_value>}; color_name must be included in settings.change_colors() parameter names"""
         cls.change_colors(**theme_dict)
+        
+    @classmethod
+    def builtin_theme(cls, name):
+        theme = {}
+        match name.lower():
+            case "purple": theme = cls.PURPLE_THEME
+            case "green": theme = cls.GREEN_THEME
+            case "blue": theme = cls.BLUE_THEME
+            case "red": theme = cls.RED_THEME
+            case "dark": theme = cls.DARK_THEME
+            case "default": theme = cls.DARK_THEME
+            case "black": theme = cls.DARK_THEME
+        cls.color_theme(theme)
     
     @classmethod
     def copy(cls)->dict[str,Any]:
